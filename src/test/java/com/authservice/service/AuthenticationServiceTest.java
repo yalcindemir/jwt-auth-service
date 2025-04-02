@@ -8,13 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.UsersResource;
-import org.keycloak.representations.idm.UserRepresentation;
 
-import javax.ws.rs.core.Response;
-import java.util.Collections;
+import jakarta.ws.rs.core.Response;
 import java.util.Optional;
 import java.util.UUID;
 

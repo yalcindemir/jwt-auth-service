@@ -1,13 +1,18 @@
 package com.authservice.service;
 
+import com.authservice.exception.OpenFgaException;
+import com.authservice.exception.ResourceNotFoundException;
 import com.authservice.model.OpenFgaAuthorization;
 import com.authservice.model.User;
 import com.authservice.repository.OpenFgaAuthorizationRepository;
+import com.authservice.repository.UserRepository;
 import dev.openfga.sdk.api.client.OpenFgaClient;
-import dev.openfga.sdk.api.client.model.CheckRequest;
-import dev.openfga.sdk.api.client.model.TupleKey;
-import dev.openfga.sdk.api.client.model.WriteRequest;
-import dev.openfga.sdk.api.client.model.WriteRequestTupleKey;
+import dev.openfga.sdk.api.client.model.ClientCheckRequest;
+import dev.openfga.sdk.api.client.model.ClientCheckResponse;
+import dev.openfga.sdk.api.client.model.ClientTupleKey;
+import dev.openfga.sdk.api.client.model.ClientWriteRequest;
+import dev.openfga.sdk.api.client.model.ClientWriteTupleKey;
+import dev.openfga.sdk.api.client.model.TupleKeys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,21 +30,26 @@ public class OpenFgaService {
 
     private final OpenFgaClient openFgaClient;
     private final OpenFgaAuthorizationRepository openFgaAuthorizationRepository;
+    private final UserRepository userRepository;
 
     /**
      * Yetkilendirme kontrolü yapar
      */
     public boolean checkAuthorization(String objectType, String objectId, String relation, String userId) {
         try {
-            CheckRequest checkRequest = new CheckRequest()
-                    .user(userId)
-                    .relation(relation)
-                    .object(objectType + ":" + objectId);
+            ClientCheckRequest checkRequest = new ClientCheckRequest();
+            checkRequest.setUser(userId);
+            checkRequest.setRelation(relation);
+            checkRequest.setObject(objectType + ":" + objectId);
 
-            var response = openFgaClient.check(checkRequest).get();
+            ClientCheckResponse response = openFgaClient.check(checkRequest).get();
             return response.getAllowed();
-        } catch (InterruptedException | ExecutionException e) {
-            log.error("OpenFGA yetkilendirme kontrolü hatası", e);
+        } catch (InterruptedException e) {
+            log.error("OpenFGA yetkilendirme kontrolü kesintiye uğradı", e);
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (ExecutionException e) {
+            log.error("OpenFGA yetkilendirme kontrolü başarısız oldu", e);
             return false;
         }
     }
@@ -50,18 +60,19 @@ public class OpenFgaService {
     @Transactional
     public void addAuthorization(String objectType, String objectId, String relation, User user) {
         try {
-            // OpenFGA'ya yetkilendirme kaydı ekle
-            WriteRequestTupleKey tupleKey = new WriteRequestTupleKey()
-                    .user(user.getId().toString())
-                    .relation(relation)
-                    .object(objectType + ":" + objectId);
+            ClientWriteTupleKey writeTupleKey = new ClientWriteTupleKey();
+            writeTupleKey.setUser(user.getId().toString());
+            writeTupleKey.setRelation(relation);
+            writeTupleKey.setObject(objectType + ":" + objectId);
+            
+            TupleKeys writes = new TupleKeys();
+            writes.setTupleKeys(Collections.singletonList(writeTupleKey));
 
-            WriteRequest writeRequest = new WriteRequest()
-                    .writes(Collections.singletonList(tupleKey));
+            ClientWriteRequest writeRequest = new ClientWriteRequest();
+            writeRequest.setWrites(writes);
 
             openFgaClient.write(writeRequest).get();
 
-            // Veritabanına yetkilendirme kaydı ekle
             OpenFgaAuthorization authorization = OpenFgaAuthorization.builder()
                     .objectType(objectType)
                     .objectId(objectId)
@@ -72,7 +83,7 @@ public class OpenFgaService {
             openFgaAuthorizationRepository.save(authorization);
         } catch (InterruptedException | ExecutionException e) {
             log.error("OpenFGA yetkilendirme ekleme hatası", e);
-            throw new RuntimeException("Yetkilendirme eklenirken hata oluştu", e);
+            throw new OpenFgaException("Yetkilendirme eklenirken hata oluştu", e);
         }
     }
 
@@ -82,24 +93,25 @@ public class OpenFgaService {
     @Transactional
     public void removeAuthorization(String objectType, String objectId, String relation, User user) {
         try {
-            // OpenFGA'dan yetkilendirme kaydını kaldır
-            TupleKey tupleKey = new TupleKey()
-                    .user(user.getId().toString())
-                    .relation(relation)
-                    .object(objectType + ":" + objectId);
+            ClientTupleKey deleteTupleKey = new ClientTupleKey();
+            deleteTupleKey.setUser(user.getId().toString());
+            deleteTupleKey.setRelation(relation);
+            deleteTupleKey.setObject(objectType + ":" + objectId);
 
-            WriteRequest writeRequest = new WriteRequest()
-                    .deletes(Collections.singletonList(tupleKey));
+            TupleKeys deletes = new TupleKeys();
+            deletes.setTupleKeys(Collections.singletonList(deleteTupleKey));
+
+            ClientWriteRequest writeRequest = new ClientWriteRequest();
+            writeRequest.setDeletes(deletes);
 
             openFgaClient.write(writeRequest).get();
 
-            // Veritabanından yetkilendirme kaydını kaldır
             openFgaAuthorizationRepository.findByObjectTypeAndObjectIdAndRelationAndUser(
                     objectType, objectId, relation, user
             ).ifPresent(openFgaAuthorizationRepository::delete);
         } catch (InterruptedException | ExecutionException e) {
             log.error("OpenFGA yetkilendirme kaldırma hatası", e);
-            throw new RuntimeException("Yetkilendirme kaldırılırken hata oluştu", e);
+            throw new OpenFgaException("Yetkilendirme kaldırılırken hata oluştu", e);
         }
     }
 
@@ -107,8 +119,8 @@ public class OpenFgaService {
      * Kullanıcının tüm yetkilendirmelerini getirir
      */
     public List<OpenFgaAuthorization> getUserAuthorizations(UUID userId) {
-        User user = new User();
-        user.setId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Kullanıcı bulunamadı: " + userId));
         return openFgaAuthorizationRepository.findByUser(user);
     }
 

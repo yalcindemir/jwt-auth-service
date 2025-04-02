@@ -1,5 +1,6 @@
 package com.authservice.service;
 
+import com.authservice.exception.ResourceNotFoundException;
 import com.authservice.model.Device;
 import com.authservice.model.User;
 import com.authservice.model.UserToken;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -92,7 +94,7 @@ public class AuthenticationService {
      */
     @Transactional
     public UserToken saveUserToken(User user, String token, String refreshToken) {
-        LocalDateTime expiryDate = LocalDateTime.now().plusMillis(jwtExpiration);
+        LocalDateTime expiryDate = LocalDateTime.now().plus(Duration.ofMillis(jwtExpiration));
         
         UserToken userToken = UserToken.builder()
                 .user(user)
@@ -112,7 +114,7 @@ public class AuthenticationService {
     @Transactional
     public Device blockDevice(UUID deviceId) {
         Device device = deviceRepository.findById(deviceId)
-                .orElseThrow(() -> new RuntimeException("Cihaz bulunamadı"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cihaz bulunamadı"));
         
         device.setBlocked(true);
         return deviceRepository.save(device);
@@ -124,7 +126,7 @@ public class AuthenticationService {
     @Transactional
     public Device unblockDevice(UUID deviceId) {
         Device device = deviceRepository.findById(deviceId)
-                .orElseThrow(() -> new RuntimeException("Cihaz bulunamadı"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cihaz bulunamadı"));
         
         device.setBlocked(false);
         return deviceRepository.save(device);
@@ -136,7 +138,7 @@ public class AuthenticationService {
     @Transactional
     public void revokeToken(String token) {
         UserToken userToken = userTokenRepository.findByToken(token)
-                .orElseThrow(() -> new RuntimeException("Token bulunamadı"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token bulunamadı"));
         
         userToken.setRevoked(true);
         userTokenRepository.save(userToken);

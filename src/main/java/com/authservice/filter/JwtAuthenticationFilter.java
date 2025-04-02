@@ -1,7 +1,6 @@
 package com.authservice.filter;
 
 import com.authservice.config.JwtTokenProvider;
-import com.authservice.service.AuthenticationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,7 +25,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
-    private final AuthenticationService authenticationService;
 
     @Override
     protected void doFilterInternal(

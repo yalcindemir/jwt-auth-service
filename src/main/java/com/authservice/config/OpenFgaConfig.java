@@ -2,12 +2,13 @@ package com.authservice.config;
 
 import dev.openfga.sdk.api.client.OpenFgaClient;
 import dev.openfga.sdk.api.configuration.ClientConfiguration;
-import dev.openfga.sdk.api.configuration.ClientCredentials;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import lombok.extern.slf4j.Slf4j;
 
 @Configuration
+@Slf4j
 public class OpenFgaConfig {
 
     @Value("${openfga.api-url}")
@@ -24,14 +25,19 @@ public class OpenFgaConfig {
 
     @Bean
     public OpenFgaClient openFgaClient() {
-        ClientConfiguration configuration = new ClientConfiguration()
-                .apiUrl(apiUrl)
-                .storeId(storeId)
-                .authorizationModelId(authorizationModelId);
+        try {
+            ClientConfiguration configuration = new ClientConfiguration()
+                    .apiUrl(apiUrl)
+                    .storeId(storeId)
+                    .authorizationModelId(authorizationModelId);
 
-        // Eğer kimlik doğrulama gerekiyorsa
-        // configuration.credentials(new ClientCredentials().clientId("...").clientSecret("..."));
+            // Eğer kimlik doğrulama gerekiyorsa
+            // configuration.credentials(new ClientCredentials().clientId("...").clientSecret("..."));
 
-        return new OpenFgaClient(configuration);
+            return new OpenFgaClient(configuration);
+        } catch (Exception e) {
+            log.error("OpenFGA client oluşturulurken hata: {}", e.getMessage(), e);
+            throw new RuntimeException("OpenFGA client oluşturulamadı", e);
+        }
     }
 }

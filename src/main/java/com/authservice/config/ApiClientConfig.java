@@ -16,7 +16,7 @@ public class ApiClientConfig {
     @LoadBalanced
     public RestTemplate restTemplate() {
         RestTemplate restTemplate = new RestTemplate();
-        // API Gateway üzerinden diğer servislere istek yapmak için kullanılacak
+        // Servis keşfi için kullanılacak
         return restTemplate;
     }
 }
