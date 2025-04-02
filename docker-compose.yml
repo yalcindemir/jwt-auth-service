@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:15 # Or your preferred Postgres version
+    container_name: auth_postgres
+    environment:
+      POSTGRES_DB: auth_service_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres # Use secrets in production!
+    ports:
+      - "5432:5432" # Map host port 5432 to container port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  auth-service:
+    build: . # Build the image from the Dockerfile in the current directory
+    # Or use a pre-built image:
+    # image: your-dockerhub-username/auth-service:latest
+    container_name: auth_service_app
+    depends_on:
+      - postgres_db
+    ports:
+      - "8081:8081" # Map host port 8081 to container port 8081
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres_db:5432/auth_service_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres # Use secrets in production!
+      # Add other environment variables needed by your app (Keycloak, OpenFGA URLs, etc.)
+      # KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080/auth
+      # OPENFGA_API_URL: http://openfga:8080
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
